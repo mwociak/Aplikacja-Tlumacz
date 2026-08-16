@@ -1,5 +1,39 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
+
+// --- Podpisywanie wersji release: sekrety NIE pochodzą z repo ---
+// Kolejność źródeł: zmienne środowiskowe (sekrety CI / Freebuff API Keys),
+// właściwości Gradle (-P...), lokalny plik keystore.properties (gitignored).
+// Jeśli brakuje pliku klucza (my-upload-key.jks) lub danych podpisywania,
+// build release zostanie wygenerowany bez podpisu (nie spowoduje błędu).
+val keystoreProperties = Properties().apply {
+  val propsFile = rootProject.file("keystore.properties")
+  if (propsFile.exists()) propsFile.inputStream().use { load(it) }
+}
+
+val keystoreFile = rootProject.file("my-upload-key.jks")
+
+val keystorePassword = (
+  System.getenv("KEYSTORE_PASSWORD")
+    ?: findProperty("KEYSTORE_PASSWORD") as? String
+    ?: keystoreProperties.getProperty("KEYSTORE_PASSWORD")
+  ).orEmpty()
+val keystoreAlias = (
+  System.getenv("KEY_ALIAS")
+    ?: findProperty("KEY_ALIAS") as? String
+    ?: keystoreProperties.getProperty("KEY_ALIAS")
+  ).orEmpty()
+val keystoreKeyPassword = (
+  System.getenv("KEY_PASSWORD")
+    ?: findProperty("KEY_PASSWORD") as? String
+    ?: keystoreProperties.getProperty("KEY_PASSWORD")
+  ).orEmpty()
+
+val hasKeystore = keystoreFile.exists() &&
+  keystorePassword.isNotBlank() &&
+  keystoreAlias.isNotBlank() &&
+  keystoreKeyPassword.isNotBlank()
 
 plugins {
   alias(libs.plugins.android.application)
@@ -28,25 +62,18 @@ android {
   // --- KONFIGURACJA PODPISU RELEASE ---
   signingConfigs {
     create("release") {
-      val keystoreFile = file("${rootDir}/my-upload-key.jks")
-      if (keystoreFile.exists()) {
+      if (hasKeystore) {
         storeFile = keystoreFile
-        storePassword = System.getenv("KEYSTORE_PASSWORD") 
-          ?: findProperty("KEYSTORE_PASSWORD") as? String 
-          ?: ""
-        keyAlias = System.getenv("KEY_ALIAS") 
-          ?: findProperty("KEY_ALIAS") as? String 
-          ?: ""
-        keyPassword = System.getenv("KEY_PASSWORD") 
-          ?: findProperty("KEY_PASSWORD") as? String 
-          ?: ""
+        storePassword = keystorePassword
+        keyAlias = keystoreAlias
+        keyPassword = keystoreKeyPassword
       }
     }
   }
 
   buildTypes {
     release {
-      // OPTIMALIZACJA APK
+      // OPTYMALIZACJA APK
       isMinifyEnabled = true           // włącza R8 (obfuscacja)
       isShrinkResources = true         // usuwa nieużywane zasoby
 
@@ -55,13 +82,13 @@ android {
         "proguard-rules.pro"
       )
 
-      if (file("${rootDir}/my-upload-key.jks").exists()) {
+      if (hasKeystore) {
         signingConfig = signingConfigs.getByName("release")
       }
     }
 
     debug {
-      // domyślny debug.keystore z C:\Users\mwoci\.android\debug.keystore
+      // domyślny debug.keystore (generowany automatycznie przez AGP)
     }
   }
 

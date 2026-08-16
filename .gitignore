@@ -23,3 +23,7 @@ debug.keystore
 
 # Environment files
 .env.*.com.mcodeproject
+
+# Klucze i dane podpisywania — nigdy nie powinny trafiać do repo
+keystore.properties
+signkey
