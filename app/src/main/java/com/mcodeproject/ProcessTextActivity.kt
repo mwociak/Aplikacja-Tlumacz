@@ -47,6 +47,15 @@ import com.mcodeproject.ui.TranslationViewModel
 import com.mcodeproject.ui.theme.TranslatorTheme
 import dagger.hilt.android.AndroidEntryPoint
 
+private val POLISH_CHARS = Regex("[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
+
+/**
+ * Proste wykrywanie języka: obecność polskich znaków → polski, w innym
+ * przypadku zakładamy angielski ("en").
+ */
+private fun detectLanguage(text: String): String =
+    if (POLISH_CHARS.containsMatchIn(text)) "pl" else "en"
+
 /**
  * Aktywność uruchamiana z menu akcji na zaznaczonym tekście
  * (android.intent.action.PROCESS_TEXT). Android przekazuje zaznaczony
@@ -67,11 +76,18 @@ class ProcessTextActivity : ComponentActivity() {
             ?.trim()
             .orEmpty()
 
+        // Główne okno domyślnie tłumaczy PL→EN; tutaj wykrywamy kierunek
+        // na podstawie zaznaczonego tekstu (np. angielski tekst → EN→PL).
+        val sourceLang = detectLanguage(selectedText)
+        val targetLang = if (sourceLang == "pl") "en" else "pl"
+
         setContent {
             TranslatorTheme {
                 val viewModel: TranslationViewModel = hiltViewModel()
                 ProcessTextView(
                     selectedText = selectedText,
+                    sourceLang = sourceLang,
+                    targetLang = targetLang,
                     viewModel = viewModel,
                     onClose = { finish() }
                 )
@@ -83,6 +99,8 @@ class ProcessTextActivity : ComponentActivity() {
 @Composable
 private fun ProcessTextView(
     selectedText: String,
+    sourceLang: String,
+    targetLang: String,
     viewModel: TranslationViewModel,
     onClose: () -> Unit
 ) {
@@ -92,6 +110,7 @@ private fun ProcessTextView(
     LaunchedEffect(selectedText) {
         started = true
         if (selectedText.isNotBlank()) {
+            viewModel.setSourceAndTarget(sourceLang, targetLang)
             viewModel.onSourceTextChanged(selectedText, isImmediate = true)
         }
     }
@@ -122,11 +141,18 @@ private fun ProcessTextView(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Tłumacz",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = "Tłumacz",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${sourceLang.uppercase()} → ${targetLang.uppercase()}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))

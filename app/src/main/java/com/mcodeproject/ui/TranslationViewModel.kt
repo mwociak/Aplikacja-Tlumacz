@@ -153,6 +153,17 @@ class TranslationViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Ustawia kierunek tłumaczenia (np. dla ProcessTextActivity).
+     * Nie dotyka tekstu źródłowego ani wyniku.
+     */
+    fun setSourceAndTarget(sourceLang: String, targetLang: String) {
+        _uiState.value = _uiState.value.copy(
+            sourceLang = sourceLang,
+            targetLang = targetLang
+        )
+    }
+
     fun swapLanguages() {
         val current = _uiState.value
         val newSourceLang = current.targetLang
